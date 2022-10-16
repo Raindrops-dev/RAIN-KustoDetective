@@ -1,0 +1,20 @@
+//Building arrays
+//Getting all the VINs that were moving at the time of the robbery
+let DuringRobbery = 
+Traffic
+| where Timestamp between (datetime(2022-10-16 08:17:00) .. datetime(2022-10-16 08:30:59));
+//Starting main processing
+//Getting all the VINs that were moving around the bank after the robbery
+let AfterRobbery =
+Traffic
+| where Ave == "157" and Street == "148"
+| where Timestamp between (datetime(2022-10-16 08:31:00) .. datetime(2022-10-16 08:39:59));
+//Getting all the VINs that were in the area of the robbery after the robbery, but not during the robbery
+let PossibleCars = 
+AfterRobbery
+| join kind=leftanti DuringRobbery on $left.VIN == $right.VIN
+| summarize by VIN;
+Traffic
+| where Timestamp > (datetime(2022-10-16 08:40:00))
+| where VIN in (PossibleCars)
+| summarize arg_max(Timestamp, *) by VIN
