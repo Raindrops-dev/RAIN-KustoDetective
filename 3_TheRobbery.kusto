@@ -18,3 +18,7 @@ Traffic
 | where Timestamp > (datetime(2022-10-16 08:40:00))
 | where VIN in (PossibleCars)
 | summarize arg_max(Timestamp, *) by VIN
+| summarize Hitcount = count() by Ave, Street
+| where Hitcount == 3
+| join kind=rightsemi Traffic on $left.Ave == $right.Ave and $left.Street == $right.Street
+| where VIN in (PossibleCars)
