@@ -14,11 +14,16 @@ let PossibleCars =
 AfterRobbery
 | join kind=leftanti DuringRobbery on $left.VIN == $right.VIN
 | summarize by VIN;
+//Getting all the movement hits from the cameras for the cars that were identified in the previous step
 Traffic
 | where Timestamp > (datetime(2022-10-16 08:40:00))
 | where VIN in (PossibleCars)
+//Getting the LAST movement hit for each car
 | summarize arg_max(Timestamp, *) by VIN
+//Using count to identify the location that has seen the most hits by different cars
 | summarize Hitcount = count() by Ave, Street
+//Filtering by the location that has 3 hits exactly
 | where Hitcount == 3
+//Joining the main table to the identified value to find out the cars that were found in that location
 | join kind=rightsemi Traffic on $left.Ave == $right.Ave and $left.Street == $right.Street
 | where VIN in (PossibleCars)
