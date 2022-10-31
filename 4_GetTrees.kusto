@@ -1,0 +1,16 @@
+let 4schubert =
+nyc_trees
+| where (status != "Stump" or status != "Dead") and spc_common == "'Schubert' chokecherry"
+| summarize 4schubertcount = count() by hash = geo_point_to_h3cell(longitude, latitude, 10)
+| where 4schubertcount == 4;
+let turkish = 
+nyc_trees
+| where (status != "Stump" or status != "Dead") and spc_common == "Turkish hazelnut"
+| summarize turkishhazelnutcount = count() by hash = geo_point_to_h3cell(longitude, latitude, 10)
+| join kind=leftsemi 4schubert on $left.hash == $right.hash
+| summarize by hash;
+nyc_trees
+| where (status != "Stump" or status != "Dead") and spc_common == "American linden"
+| extend hash = geo_point_to_h3cell(longitude, latitude, 10)
+| where hash has_any (turkish)
+| extend Link=strcat('https://www.google.com/maps/@', latitude, ',', longitude, ',4a,75y,32.0h,79.0t/data=!3m7!1e1!3m5!1s-1P!2e0!5s20191101T000000!7i16384!8i8192')
