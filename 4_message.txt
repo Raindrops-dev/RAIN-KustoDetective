@@ -26,10 +26,12 @@ with (docstring = "2015 NYC Tree Census")
 .ingest async into table nyc_trees ('https://kustodetectiveagency.blob.core.windows.net/el-puente/1.csv.gz')
 .ingest async into table nyc_trees ('https://kustodetectiveagency.blob.core.windows.net/el-puente/2.csv.gz')
 .ingest async into table nyc_trees ('https://kustodetectiveagency.blob.core.windows.net/el-puente/3.csv.gz')
+
 // Get a virtual tour link with Latitude/Longitude coordinates
 .create-or-alter function with (docstring = "Virtual tour starts here", skipvalidation = "true") VirtualTourLink(lat:real, lon:real) { 
 	print Link=strcat('https://www.google.com/maps/@', lat, ',', lon, ',4a,75y,32.0h,79.0t/data=!3m7!1e1!3m5!1s-1P!2e0!5s20191101T000000!7i16384!8i8192')
 }
+
 // Decrypt message helper function. Usage: print Message=Decrypt(message, key)
 .create-or-alter function with 
   (docstring = "Use this function to decrypt messages")
