@@ -2,7 +2,7 @@
 
 #importing CSV file with endpoints
 Write-Output "Importing CSV file with endpoints"
-$endpoints = Import-Csv -Path "E:\Andrei\Download\prime-numbers.csv\sorted-prime-numbers.csv"
+$endpoints = Import-Csv -Path ".\sorted-prime-numbers.csv"
 
 Write-Output "Starting do while loop"
 #do while loop polling endpoints until one doesn't answer 404

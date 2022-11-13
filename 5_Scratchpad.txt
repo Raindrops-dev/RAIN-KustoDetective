@@ -1,0 +1,15 @@
+https://sneakinto.z13.web.core.windows.net/194.243.69.176
+https://sneakinto.z13.web.core.windows.net/146.49.19.37
+https://sneakinto.z13.web.core.windows.net/236.48.237.42
+https://sneakinto.z13.web.core.windows.net/119.10.30.154
+
+Date taken: 
+- 2020-07-09
+
+Geo:
+Lon: -3.380104
+Lat: 58.968867
+
+bing.com?q=uncomfortable+%2Belephant+%2Bescapes+%2Bcircus+%2Bbreaks+%2Beverything+%2Btoulouse+%2Billustrated
+
+print datetime_add('day', (1891 % 1000), make_datetime(2020,07,09))

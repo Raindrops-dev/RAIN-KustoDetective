@@ -1,0 +1,65 @@
+// Solution to find the 4 users who only connected to one channel and whose connections were all clustered in a time frame
+// Getting the IPs of every user who connected to a channel
+let UserIps = ChatLogs
+| project splitted=split(Message, '\'')
+| project User = splitted[1], Action = splitted[2], Target = splitted[3]
+| where Action has "logged in from"
+| summarize by tostring(User), ip = tostring(Target);
+//Getting the users who have connected to any channel
+let ChannelUsers = ChatLogs
+| project splitted=split(Message, '\'')
+| project User = splitted[1], Action = splitted[2], Target = splitted[3]
+| where tostring(Action) has "sent message to the channel"
+| summarize by tostring(User), tostring(Target);
+//Getting the channels with only 4 users
+let ChannelsWith4users = ChatLogs
+| project splitted=split(Message, '\'')
+| project User = splitted[1], Action = splitted[2], Target = splitted[3]
+| where tostring(Action) has "sent message to the channel"
+| summarize ChannelUsersCount = dcount(tostring(User)) by tostring(Target)
+| where ChannelUsersCount == 4
+| summarize by tostring(Target);
+//Building timeframes of 10m, sorting the channels by amount of timeframes where users have interacted with the channel, taking the channel with the least timeframes and then looking up the Users and then the IPs from the previous queries
+ChatLogs
+| project Timestamp, splitted=split(Message, '\'')
+| project Timestamp, tostring(User = splitted[1]), tostring(Action = splitted[2]), tostring(Target = splitted[3])
+| join kind=leftsemi ChannelsWith4users on $left.Target == $right.Target
+| summarize count() by bin(Timestamp, 10m), Target
+| summarize TimeTranche = dcount(Timestamp) by Target
+| order by TimeTranche asc
+| take 1
+| lookup ChannelUsers on Target
+| lookup UserIps on User
+
+
+// 1) Utility to discover secondary messages.
+// Usage: ReadMessage(Message, Key)
+let ReadMessage = (Message:string, Key:string) 
+{
+    let m = Message; let K = Key; let l = toscalar(print s = split(split(K,':')[1], ',') | mv-expand s | summarize make_list(tolong(s)));
+    let ma = (i1:long, i2:long) { make_string(repeat(tolong(l[i1])-tolong(l[i2]), 1))}; 
+    let ms = (d:dynamic, s:long, e:long) { make_string(array_slice(d, s, e)) };   
+    let mc = m has '...';
+    print s=split(split(replace_regex(m, @'[\s\?]+', ' '),substring(K,9,3))[1], ' ')
+    | mv-expand with_itemindex=r s to typeof(string) | serialize 
+    | where r in (l)
+    | extend s = iif(r-1 == prev(r), replace_string(strcat(prev(s), s),'o','ou'), s)
+    | where (r+1 != next(r))
+    | summarize s=strcat_array(make_list(s), iff(mc, '+%2B', ' '))
+    | extend k = series_subtract(series_add(to_utf8(K), l), repeat(23, 10))
+    | project result=iif(mc, strcat(ms(k,0,3), ma(8,2), ms(k,4,6), ms(l,8,8), ms(k,7,7), ma(8,0), s), s)
+};
+ReadMessage(
+```
+PS:
+Feeling uncomfortable and wondering about an elephant in the room: why would I help you?
+Nothing escapes you, ha?
+Let’s put it this way: we live in a circus full of competition. I can use some of your help, and nothing breaks if you use mine... You see, everything is about symbiosis.
+Anyway, what do you have to lose? Look on an illustrated past, fast forward N days and realize the future is here.
+```,
+h@'wytaPUJM!PS:2,7,17,29,42,49,58,59,63'
+)
+
+//Code to find the correct date
+//bing.com?q=uncomfortable+%2Belephant+%2Bescapes+%2Bcircus+%2Bbreaks+%2Beverything+%2Btoulouse+%2Billustrated
+print datetime_add('day', (1891 % 1000), make_datetime(2020,07,09))
