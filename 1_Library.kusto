@@ -1,0 +1,8 @@
+//Solution to the first problem of Kusto Detective Agent
+//If you want to see another much more elegant solution: https://github.com/leomindez/kusto-detective-agency
+Shelves 
+| mv-expand rf_id = rf_ids to typeof(string)
+| lookup Books on rf_id 
+| project shelf, author, book_title, total_weight, weight_gram
+| summarize calculatedweight = sum(weight_gram), statedweight = max(total_weight) by shelf
+| extend Difference = (statedweight - calculatedweight)

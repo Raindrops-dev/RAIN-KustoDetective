@@ -1,0 +1,16 @@
+//Not very elegant at all, but it works
+let maybepoppy = Votes
+| order by Timestamp asc
+| where vote == "Poppy"
+| summarize c = count() by bin(Timestamp, 1m), via_ip
+| summarize votecount = count() by c
+| where c == 1
+| extend vote = "Pop";
+Votes
+| summarize votecount=count() by vote
+| where vote != "Poppy"
+| union maybepoppy
+| as hint.materialized=true T
+| extend Total = toscalar(T | summarize sum(votecount))
+| project vote, Percentage = round(votecount*100.0 / Total, 1), votecount
+| order by votecount
