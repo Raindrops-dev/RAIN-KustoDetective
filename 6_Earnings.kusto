@@ -1,0 +1,11 @@
+let CaseBounty = 
+DetectiveCases
+| where EventType == 'CaseOpened'
+| extend Bounty = toreal(Properties.Bounty)
+| summarize by CaseId, Bounty;
+DetectiveCases
+| where EventType == "CaseSolved"
+| summarize arg_min(Timestamp,*) by CaseId
+| lookup CaseBounty on CaseId
+| project CaseId, DetectiveId, Bounty
+| summarize TotalEarnings=sum(Bounty) by DetectiveId
