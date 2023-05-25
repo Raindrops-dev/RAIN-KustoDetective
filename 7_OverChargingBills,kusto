@@ -1,0 +1,6 @@
+Consumption
+| summarize DedupConsumed = max(Consumed) by HouseholdId, Timestamp, MeterType
+| summarize TotalConsumed = sum(DedupConsumed) by MeterType  
+| lookup Costs on MeterType  
+| extend TotalCost = TotalConsumed*Cost  
+| summarize FinalTotalCost = round(sum(TotalCost) , 4)
