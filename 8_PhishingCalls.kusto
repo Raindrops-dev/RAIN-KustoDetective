@@ -1,0 +1,12 @@
+PhoneCalls 
+| where EventType == 'Connect'
+| extend Hidden=tobool(Properties.IsHidden)
+| where Hidden == true
+| join kind=inner
+    (PhoneCalls
+    | where EventType == 'Disconnect'
+    | extend DisconnectProperties = Properties) 
+    on CallConnectionId 
+| where DisconnectProperties.DisconnectedBy == 'Destination'
+| summarize unique_destinations=dcount(tostring(Properties.Destination)) by Origin=tostring(Properties.Origin)
+| order by unique_destinations desc
