@@ -1,0 +1,24 @@
+// Preparing the initial table with the last seen location for the stolen cars
+let _VinsAndLocations = 
+materialize (
+    StolenCars
+    | join kind=inner (CarsTraffic) on $left.VIN == $right.VIN
+    | summarize arg_max(Timestamp, Ave, Street) by VIN
+    | extend TimeKey = bin(Timestamp, 5min)
+    | project TimeKey, Ave, Street
+    );
+// Getting all the VINs that were in the same location within an interval of 5 minutes
+let _allvins = _VinsAndLocations
+| join kind=inner (
+    CarsTraffic
+    | extend TimeKey = bin(Timestamp, 5min)
+    ) on TimeKey, Ave, Street
+| summarize by VIN;
+// Getting the last seen location for each VIN, and getting the most visited one. Remove the first two results because those are the plate swap locations and you have the solution on the 3rd row!
+_allvins
+| join kind=inner (
+    CarsTraffic
+    | summarize arg_max(Timestamp, Ave, Street) by VIN
+    ) on VIN
+| summarize count() by Ave, Street
+| order by count_ desc
