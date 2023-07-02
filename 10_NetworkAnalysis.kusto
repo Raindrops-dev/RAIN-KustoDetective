@@ -1,0 +1,14 @@
+//Horribly unoptimized query but it works if you have a massive cluster
+NetworkMetrics
+| evaluate ipv4_lookup(IpInfo, ClientIP, IpCidr)
+| make-series SumBytes = avg(BytesReceived) on Timestamp step 1d by Info, TargetIP
+| extend (anomalies, score, baseline) = series_decompose_anomalies(SumBytes)
+| mv-expand
+    anomalies to typeof(long),
+    score to typeof(long),
+    baseline to typeof(long),
+    Timestamp to typeof(datetime),
+    SumBytes to typeof(long)
+| where anomalies == 1
+| sort by score
+| take 10
