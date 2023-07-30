@@ -1,0 +1,41 @@
+// Preparing the expanded data
+let ParsedData = StorageArchiveLogs
+    | parse EventText with TransactionType " blob transaction: '" BlobURI "'" *
+    | extend HostName = tostring((parse_url(BlobURI)).Host);
+// Preparing the list of hosts whose files weren't completely deleted in the backups
+let NotDeletedHosts = ParsedData
+    | where TransactionType == "Delete"
+    | where EventText contains "backup is partially removed, some parts may still be available in the archive location"
+    | join kind=leftanti (
+        ParsedData
+            | where TransactionType == "Delete"
+            | where EventText contains "backup is completely removed"
+            | project BlobURI
+    ) on BlobURI;
+// Preparing the list of backup locations
+let BackupLocations = ParsedData
+    | where TransactionType == "Create"
+    | parse EventText with * "backup is created on" BackupLocation;
+// Preparing the list of hosts with the number of reads
+let ViewsCount = ParsedData
+    | parse EventText with "Read blob transaction: '" BlobURI "' read access (" ReadCount:long " reads) were detected on the origin"
+    | summarize HostReadCount = sum(ReadCount) by HostName;
+// Preparing the list of hosts with the anomaly scores
+let AnomalyScores = ParsedData
+    | where TransactionType == "Read"
+    | parse EventText with "Read blob transaction: '" BlobURI "' read access (" ReadCount:long " reads) were detected on the origin"
+    | extend HostName = tostring((parse_url(BlobURI)).Host)
+    | make-series DailyReads = sum(ReadCount) on Timestamp step 1d by HostName
+    | extend (DailyReadsAnomaly, DailyReadsAnomalyScore) = series_decompose_anomalies(DailyReads)
+    | mv-expand DailyReadsAnomalyScore to typeof(double)
+    | mv-expand DailyReadsAnomaly to typeof(double)
+    | where DailyReadsAnomaly < 0
+    | where DailyReadsAnomalyScore != 0
+    | summarize by HostName, DailyReadsAnomalyScore;
+// Joining the data
+NotDeletedHosts
+| join kind=inner (BackupLocations) on BlobURI
+| join kind=inner (ViewsCount) on HostName
+| join kind=inner (AnomalyScores) on HostName
+| summarize by BlobURI, HostName, BackupLocation, HostReadCount, DailyReadsAnomalyScore
+| sort by DailyReadsAnomalyScore asc
