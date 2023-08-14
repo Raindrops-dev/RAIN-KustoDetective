@@ -1,0 +1,62 @@
+//Preparing the tables with the geohashes already added
+.set-or-replace async AirportsHash <|
+    AirportsH3
+    | extend geohash = geo_point_to_s2cell(lon, lat, 9)
+
+.set-or-replace async FlightsHash <|
+    Flights
+    | extend geohash = geo_point_to_s2cell(lon, lat, 9)
+
+
+//Preparing list of cities known to NOT be correct
+let wrongcities = dynamic(["Doha", "Zaventem", "London", "Dublin", "Seattle", "Larnaca", "Paris", "Bucharest", "Vashon", "Steenokkerzeel", "Woking", "Fingal", "Ballyboughal", "Düsseldorf", "Frankfurt am Main", "Friday Harbor", "Geneva", "Katowice", "New York", "Nottingham", "Fort Langley", "Pitt Meadows", "Vienna", "Gdańsk", "Alicante", "Bonn", "Carpi (MO)", "Stuttgart", "Lipitino", "Esslingen", "Hannover", "Kraków", "Tel Aviv", "Toronto", "Seneca", "Conway", "Renton", "Berlin", "Prague", "Zurich", "Eastsound"]);
+//Preparing the list of callsigns that were present on the ground in that airport at that time
+let _flightcallsigns =
+    AirportsHash
+    | where Id == "44686"
+    | join kind=inner (
+        FlightsHash
+        | where Timestamp between (todatetime("2023-08-11T03:30:00Z") .. todatetime("2023-08-11T05:30:00Z"))
+        | where onground == true
+        | summarize by callsign, geohash
+        )
+        on $left.geohash == $right.geohash
+    | summarize by callsign;
+//Getting all the hashes of the flightpath of each of those flights skipping the time where they were on the ground
+let _flightpaths = _flightcallsigns
+    | join kind=innerunique FlightsHash on $left.callsign == $right.callsign
+    | where onground == false
+    | summarize by Timestamp, callsign, geohash, geoaltitude, lon, lat;
+//Getting the other flights that were in the same location at the same time during a flight and keeping only those that were together
+_flightpaths
+| join kind=inner (
+    FlightsHash
+    | where onground == false
+    )
+    on $left.Timestamp == $right.Timestamp and $left.geohash == $right.geohash
+| project
+    Timestamp,
+    dohacallsign = callsign,
+    dohageoaltitude = geoaltitude,
+    dohalon = lon,
+    dohalat = lat,
+    othercallsign = callsign1,
+    othergeoaltitude = geoaltitude1,
+    otherlon = lon1,
+    otherlat = lat1,
+    geohash
+| extend GeoDistance = geo_distance_2points(dohalon, dohalat, otherlon, otherlat)
+| where dohacallsign != othercallsign //Removing duplicate results
+| where dohageoaltitude > othergeoaltitude //Removing results where the Doha flight is not higher than the other flight
+| where GeoDistance < 5000 //Removing flights that are not staying at 5km from each other
+| summarize TogetherCount = count() by dohacallsign, othercallsign //Counting the number of occurences (every 10 seconds) for each meeting
+| where TogetherCount > 12 //Removing those where the meeting was less than 120 seconds/2 minutes
+//Getting the final arrival point of each flight
+| join kind=innerunique (
+    FlightsHash
+    | summarize (ArrivalTime, LandingLon, LandingLat, ArrivalLocation)=arg_max(Timestamp, lon, lat, geohash) by callsign
+    )
+    on $left.othercallsign == $right.callsign
+| lookup (AirportsHash) on $left.ArrivalLocation == $right.geohash
+| where geo_distance_2points(lon, lat, LandingLon, LandingLat) < 5000 // Assume a 5km radius is enough
+| where municipality !in (wrongcities)

@@ -1,0 +1,24 @@
+// Getting the a table with the numberblock and the matched word to process via powershell
+let SourceWords = NationalGalleryArt
+| extend words = extract_all(@"(\w+)", ProvenanceText)
+| project tolong(ObjectId), words;
+let CorrectMatchedWord = EncryptedText
+| extend numberBlocks = extract_all(@"(\d+/\d+)", Text)
+| mv-expand with_itemindex=idx numberBlocks
+| parse numberBlocks with ObjectId "/" WordCount
+| project numberBlocks, tolong(ObjectId), tolong(WordCount), idx
+| join kind=inner SourceWords on $left.ObjectId == $right.ObjectId
+| extend MatchedWord = words[WordCount]
+| project numberBlocks, MatchedWord, idx
+| sort by idx asc;
+CorrectMatchedWord
+
+//Getting the most common word
+NationalGalleryArt
+| summarize by Title
+| extend words = tolower(Title)
+| extend wordlist = extract_all(@'(\w+)', words)
+| mv-expand wordlist to typeof(string)
+| summarize count() by wordlist
+| where strlen(wordlist) >= 3
+| top 10 by count_
